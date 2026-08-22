@@ -1,44 +1,52 @@
-import re
 import random
+import re
 from pathlib import Path
+from typing import Dict, List, Optional, Tuple
 
-from gsuid_core.data_store import get_res_path
+from .resource.RESOURCE_PATH import (
+    CHEFS_PATH,
+    DARKFOOD_PATH,
+    DATA_PATH,
+    DRINK_PATH,
+    FOOD_PATH,
+    GANFANREN_PATH,
+    HELP_TXT_PATH,
+    MEMES_PATH,
+)
 
 _IMG_EXTS = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp"}
 
 
-def _list_images(directory: Path) -> list:
-    if not directory.exists():
+def _list_images(directory: Path) -> List[Path]:
+    if not directory.exists() or not directory.is_dir():
         return []
-    return [f for f in directory.iterdir() if f.suffix.lower() in _IMG_EXTS and not f.name.startswith(".")]
+    return [
+        f
+        for f in directory.iterdir()
+        if f.is_file() and f.suffix.lower() in _IMG_EXTS and not f.name.startswith(".")
+    ]
 
 
 class ImageManager:
-    def __init__(self, plugin_dir: Path):
-        self.plugin_dir = plugin_dir
-        self.user_data_dir: Path = get_res_path() / "ChisaEating"
-        self.bundled_data_dir: Path = plugin_dir / "bundled_food_data"
-        self.egg_dir: Path = plugin_dir / "Still_eating_meme"
-
-        self._worlds = ["world1", "world2", "world3", "world4", "common"]
-        self._categories = ["food", "drink", "darkfood"]
-        self._moods = ["think", "like", "speechless", "scared"]
+    def __init__(self):
+        self.data_dir: Path = DATA_PATH
+        self.worlds = ["world1", "world2", "world3", "world4", "common"]
+        self.categories = ["food", "drink", "darkfood"]
+        self.moods = ["think", "like", "speechless", "scared"]
         self._ensure_dirs()
 
-    def _ensure_dirs(self):
-        for cat in self._categories:
-            for w in self._worlds:
-                (self.user_data_dir / cat / w).mkdir(parents=True, exist_ok=True)
-        for w in self._worlds:
-            for mood in self._moods:
-                (self.user_data_dir / "memes" / w / mood).mkdir(parents=True, exist_ok=True)
-        (self.user_data_dir / "chefs").mkdir(parents=True, exist_ok=True)
-        (self.user_data_dir / "ganfanren").mkdir(parents=True, exist_ok=True)
-        for char in ["千咲", "派蒙", "达妮娅"]:
-            (self.egg_dir / char).mkdir(parents=True, exist_ok=True)
+    def _ensure_dirs(self) -> None:
+        for cat in self.categories:
+            for w in self.worlds:
+                (self.data_dir / cat / w).mkdir(parents=True, exist_ok=True)
+        for w in self.worlds:
+            for mood in self.moods:
+                (self.data_dir / "memes" / w / mood).mkdir(parents=True, exist_ok=True)
+        CHEFS_PATH.mkdir(parents=True, exist_ok=True)
+        GANFANREN_PATH.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
-    def _parse_filename(filename: str):
+    def parse_filename(filename: str) -> Tuple[Optional[str], str]:
         pattern = re.compile(
             r"^(?:【(.*?)】)?(.*?)(?:_\d+)?\.(?:jpg|jpeg|png|gif|webp|bmp)$", re.I
         )
@@ -48,25 +56,7 @@ class ImageManager:
         stem = Path(filename).stem
         return None, stem
 
-    def _scan_dir(self, base: Path, folder: str, world: str, food_type: str) -> list:
-        target = base / folder / world
-        items = []
-        for f in _list_images(target):
-            chef, food_name = self._parse_filename(f.name)
-            items.append(
-                {
-                    "raw_name": food_name,
-                    "food": food_name,
-                    "chef": chef or "none",
-                    "wv": world,
-                    "food_type": food_type,
-                    "has_image": True,
-                    "path": str(f),
-                }
-            )
-        return items
-
-    def scan_all_items(self, wv_settings: dict, category: str) -> list:
+    def scan_all_items(self, wv_settings: dict, category: str) -> List[dict]:
         cat_map = {
             "food": ("food", "特产食物"),
             "drink": ("drink", "特产饮品"),
@@ -74,16 +64,27 @@ class ImageManager:
         }
         folder_name, food_type = cat_map.get(category, ("food", "特产食物"))
 
-        pool = []
-        seen: set = set()
+        pool: List[dict] = []
+        seen = set()
 
-        for w in self._worlds:
-            for base in (self.bundled_data_dir, self.user_data_dir):
-                for item in self._scan_dir(base, folder_name, w, food_type):
-                    key = (item["raw_name"], item["wv"])
-                    if key not in seen:
-                        seen.add(key)
-                        pool.append(item)
+        for w in self.worlds:
+            target_dir = self.data_dir / folder_name / w
+            for f in _list_images(target_dir):
+                chef, food_name = self.parse_filename(f.name)
+                key = (food_name, w)
+                if key not in seen:
+                    seen.add(key)
+                    pool.append(
+                        {
+                            "raw_name": food_name,
+                            "food": food_name,
+                            "chef": chef or "none",
+                            "wv": w,
+                            "food_type": food_type,
+                            "has_image": True,
+                            "path": str(f),
+                        }
+                    )
 
         text_key_map = {
             "food": "文字食物",
@@ -109,13 +110,12 @@ class ImageManager:
                     )
         return pool
 
-    def get_chef_image(self, chef_name: str):
+    def get_chef_image(self, chef_name: str) -> Optional[str]:
         if not chef_name or chef_name == "none":
             return None
-        chef_dir = self.user_data_dir / "chefs"
-        matched = []
-        for f in _list_images(chef_dir):
-            parsed_chef, parsed_name = self._parse_filename(f.name)
+        matched: List[str] = []
+        for f in _list_images(CHEFS_PATH):
+            parsed_chef, parsed_name = self.parse_filename(f.name)
             if (
                 parsed_name == chef_name
                 or parsed_chef == chef_name
@@ -127,37 +127,54 @@ class ImageManager:
             return random.choice(gifs) if gifs else random.choice(matched)
         return None
 
-    def get_bot_meme(self, world_key: str, mood: str):
-        files = _list_images(self.user_data_dir / "memes" / world_key / mood)
+    def get_bot_meme(self, world_key: str, mood: str) -> Optional[str]:
+        files = _list_images(MEMES_PATH / world_key / mood)
         return str(random.choice(files)) if files else None
 
-    def get_egg_meme(self, char_name: str):
-        files = _list_images(self.egg_dir / char_name)
+    def get_egg_meme(self, char_name: str) -> Optional[str]:
+        char_dir = GANFANREN_PATH / char_name
+        files = _list_images(char_dir)
         return str(random.choice(files)) if files else None
 
-    def get_ganfanren_data(self) -> dict:
-        pool: dict = {}
-        user_dir = self.user_data_dir / "ganfanren"
-        for scan_dir in (self.egg_dir, user_dir):
-            if not scan_dir.exists():
+    def get_ganfanren_data(self) -> Dict[str, dict]:
+        pool: Dict[str, dict] = {}
+        if not GANFANREN_PATH.exists():
+            return pool
+
+        for folder in GANFANREN_PATH.iterdir():
+            if not folder.is_dir():
                 continue
-            for folder in scan_dir.iterdir():
-                if not folder.is_dir():
-                    continue
-                name = folder.name
-                if name not in pool:
-                    pool[name] = {"images": [], "words": []}
-                for f in folder.iterdir():
-                    if f.suffix.lower() in _IMG_EXTS:
-                        pool[name]["images"].append(str(f))
-                    elif f.name.lower() == "words.txt":
-                        for enc in ("utf-8", "gbk"):
-                            try:
-                                lines = f.read_text(encoding=enc).splitlines()
-                                pool[name]["words"].extend(
-                                    l.strip() for l in lines if l.strip()
-                                )
-                                break
-                            except (UnicodeDecodeError, Exception):
-                                continue
-        return {k: v for k, v in pool.items() if v["images"]}
+            name = folder.name
+            if name not in pool:
+                pool[name] = {"images": [], "words": []}
+            for f in folder.iterdir():
+                if f.is_file() and f.suffix.lower() in _IMG_EXTS:
+                    pool[name]["images"].append(str(f))
+                elif f.is_file() and f.name.lower() == "words.txt":
+                    for enc in ("utf-8", "gbk"):
+                        try:
+                            lines = f.read_text(encoding=enc).splitlines()
+                            pool[name]["words"].extend(
+                                l.strip() for l in lines if l.strip()
+                            )
+                            break
+                        except Exception:
+                            continue
+
+        valid_pool = {k: v for k, v in pool.items() if v["images"]}
+
+        try:
+            names = list(valid_pool.keys())
+            HELP_TXT_PATH.write_text(
+                "【系统扫描报告 - ChisaEating】\n"
+                "当前已识别到以下干饭人：\n"
+                + "\n".join(f"- {n}" for n in names)
+                + "\n\n如需在 WebUI 指定卡池，请直接复制下方文本到【指定干饭人卡池】配置框：\n"
+                + ";".join(names)
+                + "\n",
+                encoding="utf-8",
+            )
+        except Exception:
+            pass
+
+        return valid_pool
