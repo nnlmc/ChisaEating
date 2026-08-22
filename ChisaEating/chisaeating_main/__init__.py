@@ -208,8 +208,13 @@ def _build_config_snapshot() -> ConfigSnapshot:
     )
 
 
+# ---------------- 强制下载所有资源指令 (仅主人 PM=0) ----------------
 @sv.on_fullmatch("吃什么强制下载所有资源", prefix=False)
 async def on_force_download(bot: Bot, ev: Event) -> None:
+    if ev.user_pm != 0:
+        await bot.send("【越权警告】只有主人（PM=0）才可以使用该指令强制拉取资源！")
+        return
+
     if is_resource_downloading():
         await bot.send("【千小妹提示】图库资源当前正在下载中，请稍候...")
         return
@@ -224,6 +229,7 @@ async def on_force_download(bot: Bot, ev: Event) -> None:
         await bot.send(f"❌ {reply}")
 
 
+# ---------------- 加菜与上传厨师指令 (管理员) ----------------
 @sv.on_prefix(("加菜", "/加菜"), prefix=False)
 async def on_add_food(bot: Bot, ev: Event) -> None:
     if ev.user_pm > 2:
