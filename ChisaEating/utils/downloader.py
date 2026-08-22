@@ -11,18 +11,15 @@ from gsuid_core.logger import logger
 
 from .resource.RESOURCE_PATH import DATA_PATH, DRINK_PATH, FOOD_PATH
 
+# 核心下载源：CNB 高速节点 与 GitHub 直连节点
 ASSET_URLS = [
     (
-        "GitHub 直连",
+        "CNB 国内高速节点",
+        "https://cnb.cool/MimokitStudio/ChisaEatingimg/-/git/raw/main/V3.astrbot_plugin_chisa_still_eating.zip",
+    ),
+    (
+        "GitHub 直连节点",
         "https://github.com/dddada123/astrbot_plugin_chisa_still_eating_photo/releases/download/v3.0-beta/V3.astrbot_plugin_chisa_still_eating.zip",
-    ),
-    (
-        "ghproxy.net 镜像",
-        "https://ghproxy.net/https://github.com/dddada123/astrbot_plugin_chisa_still_eating_photo/releases/download/v3.0-beta/V3.astrbot_plugin_chisa_still_eating.zip",
-    ),
-    (
-        "mirror.ghproxy.com 镜像",
-        "https://mirror.ghproxy.com/https://github.com/dddada123/astrbot_plugin_chisa_still_eating_photo/releases/download/v3.0-beta/V3.astrbot_plugin_chisa_still_eating.zip",
     ),
 ]
 
@@ -84,28 +81,28 @@ async def download_and_extract_assets(
         _is_downloading = True
         try:
             if progress_callback:
-                await progress_callback("📡 正在检测下载节点连接速度与直连延迟...")
+                await progress_callback("📡 正在检测 CNB 高速节点与 GitHub 直连延迟...")
 
             speed_results = await test_mirror_speed()
             speed_log = []
             valid_sources = []
             for name, url, cost in speed_results:
                 if cost < 90000:
-                    speed_log.append(f"• {name}: {cost:.1f}ms (可用)")
+                    speed_log.append(f"• {name}: {cost:.1f}ms")
                     valid_sources.append((name, url))
                 else:
                     speed_log.append(f"• {name}: 超时/不可用")
 
             speed_report = "\n".join(speed_log)
-            logger.info(f"[ChisaEating] 下载源测速完成:\n{speed_report}")
+            logger.info(f"[ChisaEating] 下载节点测速完成:\n{speed_report}")
 
             if not valid_sources:
-                return False, f"所有下载源测速均失败，无法拉取资源！\n{speed_report}"
+                return False, f"所有下载节点测速均失败，无法拉取资源！\n{speed_report}"
 
             best_name, best_url = valid_sources[0]
             if progress_callback:
                 await progress_callback(
-                    f"⚡ 测速完成，选用最优节点【{best_name}】\n{speed_report}\n\n正在下载基础图库资源包 (约 160MB)..."
+                    f"⚡ 测速完成，优先选用最优节点【{best_name}】\n{speed_report}\n\n正在下载基础图库资源包 (约 160MB)..."
                 )
 
             zip_path = DATA_PATH / "assets_temp.zip"
