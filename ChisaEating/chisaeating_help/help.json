@@ -15,10 +15,12 @@
       {"name": "异界特产", "desc": "按世界别称抽取特产，支持鸣潮、原神等别名", "eg": "鸣潮特产", "need_ck": false, "need_sk": false, "need_admin": false}
     ]
   },
-  "自定义资源": {
-    "desc": "本地扩展食物和干饭人",
+  "资源管理": {
+    "desc": "强制更新与后台资源维护",
     "data": [
-      {"name": "自定义干饭人", "desc": "在 data/ChisaEating/ganfanren/ 下添加表情包和 words.txt", "eg": "干饭帮助", "need_ck": false, "need_sk": false, "need_admin": false}
+      {"name": "强制下载资源", "desc": "测速并强制从最优镜像拉取最新图库资源包", "eg": "吃什么强制下载所有资源", "need_ck": false, "need_sk": false, "need_admin": false},
+      {"name": "加菜", "desc": "上传并录入自定义食物/饮品 (需管理员)", "eg": "加菜 鸣潮 食物 冰吸生椰拿铁 [图]", "need_ck": false, "need_sk": false, "need_admin": true},
+      {"name": "上传厨师", "desc": "上传并收录专属厨师图鉴 (需管理员)", "eg": "上传厨师 奥黛塔 [图]", "need_ck": false, "need_sk": false, "need_admin": true}
     ]
   }
 }
