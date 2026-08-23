@@ -2,21 +2,20 @@ import json
 import random
 from collections import deque
 from pathlib import Path
-from typing import Dict, List, Optional
 
-from .resource.RESOURCE_PATH import DATA_PATH, HISTORY_PATH
+from gsuid_core.data_store import get_res_path
 
 
 class FoodDataManager:
     def __init__(self):
-        self.data_path: Path = DATA_PATH
+        self.data_path: Path = get_res_path() / "ChisaEating"
         self.data_path.mkdir(parents=True, exist_ok=True)
-        self.history_path: Path = HISTORY_PATH
+        self.history_path: Path = self.data_path / "group_history.json"
         self.history_limit: int = 30
-        self.group_history: Dict[str, deque] = {}
+        self.group_history: dict = {}
         self._load_history_cache()
 
-    def _load_history_cache(self) -> None:
+    def _load_history_cache(self):
         if self.history_path.exists():
             try:
                 data = json.loads(self.history_path.read_text(encoding="utf-8"))
@@ -25,7 +24,7 @@ class FoodDataManager:
             except Exception:
                 self.group_history = {}
 
-    def _save_history_cache(self) -> None:
+    def _save_history_cache(self):
         try:
             export = {gid: list(deq) for gid, deq in self.group_history.items()}
             self.history_path.write_text(
@@ -35,8 +34,8 @@ class FoodDataManager:
             pass
 
     def filter_and_pick(
-        self, group_id: str, full_pool: List[dict], active_wv: str, config: dict
-    ) -> Optional[dict]:
+        self, group_id: str, full_pool: list, active_wv: str, config: dict
+    ):
         if not full_pool:
             return None
 
@@ -44,7 +43,7 @@ class FoodDataManager:
         mode_roller = config.get("mode_roller", False)
         mode_normie = config.get("mode_normie", False)
 
-        filtered_pool: List[dict] = []
+        filtered_pool = []
         for item in full_pool:
             wv = item["wv"]
             if mode_normie:
