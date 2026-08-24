@@ -9,6 +9,8 @@ from gsuid_core.segment import MessageSegment
 from gsuid_core.sv import SV
 
 from ..chisaeating_config import CHISA_CONFIG
+from ..utils.downloader import STATE as _DOWNLOAD_STATE
+from ..utils.downloader import has_food_assets
 from ..utils.food_data import FoodDataManager
 from ..utils.image_manager import ImageManager
 from ..utils.rate_limiter import RateLimiter
@@ -247,6 +249,27 @@ async def _process_request(
     uid: str = ev.user_id
     group_id: str = ev.group_id or ev.user_id
     gid_str: str = str(group_id)
+
+    # 图库下载期间直接汇报进度，避免用户误以为插件卡死
+    if _DOWNLOAD_STATE.is_downloading:
+        logger.debug(f"[ChisaEating] 图库下载中，拦截点餐请求 uid={uid}")
+        await bot.send(
+            f"【千小妹下载进度】正在为你搬运跨次元美食资源\n"
+            f"当前已下载 {_DOWNLOAD_STATE.downloaded_mb:.2f} MB / "
+            f"{_DOWNLOAD_STATE.total_mb:.2f} MB（{_DOWNLOAD_STATE.percent:.1f}%）\n"
+            f"下载完成后即可正常点菜"
+        )
+        return
+
+    # 图库为空时引导主人拉取资源（对应上游 v3.5.1 行为）
+    if not has_food_assets(_image_mgr.user_data_dir):
+        logger.warning(f"[ChisaEating] 图库为空，提示拉取资源 uid={uid}")
+        await bot.send(
+            "【千小妹系统提示】检测到基础图库为空！\n"
+            "请让机器人主人发送「更新千小妹图库」拉取图包，\n"
+            f"或手动将 food 等文件夹放入\n{_image_mgr.user_data_dir}"
+        )
+        return
 
     # 黑白名单
     if CHISA_CONFIG.get_config("enable_blacklist").data:
