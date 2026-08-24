@@ -77,6 +77,7 @@ async def on_download_progress(bot: Bot, ev: Event) -> None:
         return
 
     stage_text = {
+        "probing": "正在测速选择最快节点",
         "downloading": "正在下载",
         "verifying": "正在校验 SHA-256",
         "extracting": "正在解压部署",
