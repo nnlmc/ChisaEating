@@ -13,12 +13,29 @@ def _list_images(directory: Path) -> list:
     return [f for f in directory.iterdir() if f.suffix.lower() in _IMG_EXTS and not f.name.startswith(".")]
 
 
+def _read_words(path: Path) -> list:
+    """读取干饭人台词文件。
+
+    图库里的 words.txt 编码不统一（utf-8 / 带 BOM / gbk），用 replace 兜住
+    非法字节即可，台词是展示用文本，个别乱码字符不影响功能。
+    """
+    raw = path.read_bytes()
+    text = raw.decode("utf-8-sig", errors="replace")
+    if "�" in text:
+        text = raw.decode("gbk", errors="replace")
+    return [line.strip() for line in text.splitlines() if line.strip()]
+
+
 class ImageManager:
+    """图库访问层。
+
+    所有资源统一存放在 ``get_res_path()/ChisaEating``，由「更新千小妹图库」
+    指令从远程拉取部署，插件仓库不再内置任何图片。
+    """
+
     def __init__(self, plugin_dir: Path):
         self.plugin_dir = plugin_dir
         self.user_data_dir: Path = get_res_path() / "ChisaEating"
-        self.bundled_data_dir: Path = plugin_dir / "bundled_food_data"
-        self.egg_dir: Path = plugin_dir / "Still_eating_meme"
 
         self._worlds = ["world1", "world2", "world3", "world4", "common"]
         self._categories = ["food", "drink", "darkfood"]
@@ -34,8 +51,6 @@ class ImageManager:
                 (self.user_data_dir / "memes" / w / mood).mkdir(parents=True, exist_ok=True)
         (self.user_data_dir / "chefs").mkdir(parents=True, exist_ok=True)
         (self.user_data_dir / "ganfanren").mkdir(parents=True, exist_ok=True)
-        for char in ["千咲", "派蒙", "达妮娅"]:
-            (self.egg_dir / char).mkdir(parents=True, exist_ok=True)
 
     @staticmethod
     def _parse_filename(filename: str):
@@ -78,12 +93,11 @@ class ImageManager:
         seen: set = set()
 
         for w in self._worlds:
-            for base in (self.bundled_data_dir, self.user_data_dir):
-                for item in self._scan_dir(base, folder_name, w, food_type):
-                    key = (item["raw_name"], item["wv"])
-                    if key not in seen:
-                        seen.add(key)
-                        pool.append(item)
+            for item in self._scan_dir(self.user_data_dir, folder_name, w, food_type):
+                key = (item["raw_name"], item["wv"])
+                if key not in seen:
+                    seen.add(key)
+                    pool.append(item)
 
         text_key_map = {
             "food": "文字食物",
@@ -132,32 +146,24 @@ class ImageManager:
         return str(random.choice(files)) if files else None
 
     def get_egg_meme(self, char_name: str):
-        files = _list_images(self.egg_dir / char_name)
+        """干饭人表情包，资源来自远程图库的 ganfanren/<角色名>/。"""
+        files = _list_images(self.user_data_dir / "ganfanren" / char_name)
         return str(random.choice(files)) if files else None
 
     def get_ganfanren_data(self) -> dict:
         pool: dict = {}
         user_dir = self.user_data_dir / "ganfanren"
-        for scan_dir in (self.egg_dir, user_dir):
-            if not scan_dir.exists():
+        if not user_dir.exists():
+            return pool
+        for folder in user_dir.iterdir():
+            if not folder.is_dir():
                 continue
-            for folder in scan_dir.iterdir():
-                if not folder.is_dir():
-                    continue
-                name = folder.name
-                if name not in pool:
-                    pool[name] = {"images": [], "words": []}
-                for f in folder.iterdir():
-                    if f.suffix.lower() in _IMG_EXTS:
-                        pool[name]["images"].append(str(f))
-                    elif f.name.lower() == "words.txt":
-                        for enc in ("utf-8", "gbk"):
-                            try:
-                                lines = f.read_text(encoding=enc).splitlines()
-                                pool[name]["words"].extend(
-                                    l.strip() for l in lines if l.strip()
-                                )
-                                break
-                            except (UnicodeDecodeError, Exception):
-                                continue
+            name = folder.name
+            if name not in pool:
+                pool[name] = {"images": [], "words": []}
+            for f in folder.iterdir():
+                if f.suffix.lower() in _IMG_EXTS:
+                    pool[name]["images"].append(str(f))
+                elif f.name.lower() == "words.txt":
+                    pool[name]["words"].extend(_read_words(f))
         return {k: v for k, v in pool.items() if v["images"]}
