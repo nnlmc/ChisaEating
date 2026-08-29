@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Cookie, Depends, File, HTTPException, UploadFile
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, RedirectResponse, JSONResponse
 from gsuid_core.data_store import get_res_path
 from gsuid_core.webconsole.app_app import app
 
@@ -87,7 +87,9 @@ async def login(username: str, password: str) -> dict[str, Any]:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     token = secrets.token_urlsafe(32)
     _SESSIONS[token] = time.time() + _SESSION_TTL
-    return {"status": 0, "data": {"username": _config("webui_username", "admin")}, "token": token}
+    response = JSONResponse({"status": 0, "data": {"username": _config("webui_username", "admin")}})
+    response.set_cookie("chisaeating_session", token, max_age=_SESSION_TTL, httponly=True, samesite="strict", secure=False)
+    return response
 
 
 @app.post("/api/chisaeating/logout")
