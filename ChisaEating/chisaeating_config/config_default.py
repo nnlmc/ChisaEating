@@ -14,6 +14,7 @@ from gsuid_core.utils.plugins_config.models import (
 SHOW_CONFIG_PATH = get_res_path(["ChisaEating", "show"])
 
 CONFIG_DEFAULT: Dict[str, GSC] = {
+    "_DividerScope": GsDivider("使用范围", ""),
     "forward_long_text": GsBoolConfig("长文本转发", "帮助和商会清单较长时优先使用合并转发", True),
     "convert_meme_to_gif": GsBoolConfig("表情包自动转 GIF", "启用后尝试将静态附加表情转换为 GIF；主菜图片不受影响", True),
     "enable_ai": GsBoolConfig("启用智能拟人回复", "预留 AI 回复开关；关闭时使用本地文案", False),
