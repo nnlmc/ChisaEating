@@ -273,6 +273,14 @@ async def on_common_drink(bot: Bot, ev: Event) -> None:
     await _process_request(bot, ev, "drink", forced_world="common")
 
 
+@sv.on_regex(r"^(?:召唤|想和).+(?:下厨|吃饭)$|^.+特供料理$", prefix=False)
+async def on_chef_request(bot: Bot, ev: Event) -> None:
+    """按消息中的厨师名称抽取专属料理。"""
+    if _extract_forced_chef(ev.raw_text) is None:
+        return
+    await _process_request(bot, ev, "food")
+
+
 @sv.on_command(("特产",), prefix=False)
 async def on_world_special(bot: Bot, ev: Event) -> None:
     msg: str = ev.raw_text.strip()
