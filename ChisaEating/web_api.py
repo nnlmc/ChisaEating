@@ -63,6 +63,28 @@ async def chisaeating_catalog(_: Any = Depends(require_auth)) -> dict[str, Any]:
     return {"status": 0, "data": result}
 
 
+@app.get("/api/chisaeating/skin")
+async def chisaeating_skin(_: Any = Depends(require_auth)) -> dict[str, Any]:
+    return {"status": 0, "data": {"skins": ["maple_dew", "chisa_red_black", "chisa_red_white", "yy_xuanling"], "default": "maple_dew"}}
+
+
+@app.get("/api/chisaeating/ganfanren")
+async def chisaeating_ganfanren(_: Any = Depends(require_auth)) -> dict[str, Any]:
+    directory = _DATA_ROOT / "ganfanren"
+    result = []
+    if directory.is_dir():
+        for item in sorted(directory.iterdir()):
+            if item.is_dir() and not item.is_symlink():
+                words = item / "words.txt"
+                result.append({"name": item.name, "words": words.read_text(encoding="utf-8", errors="replace").splitlines() if words.is_file() else []})
+    return {"status": 0, "data": result}
+
+
+@app.get("/api/chisaeating/download/progress")
+async def chisaeating_download_progress(_: Any = Depends(require_auth)) -> dict[str, Any]:
+    return {"status": 0, "data": {"downloading": STATE.is_downloading, "stage": STATE.stage, "downloaded_mb": STATE.downloaded_mb, "total_mb": STATE.total_mb, "percent": STATE.percent}}
+
+
 @app.get("/api/chisaeating/status")
 async def chisaeating_status(_: Any = Depends(require_auth)) -> dict[str, Any]:
     return {
