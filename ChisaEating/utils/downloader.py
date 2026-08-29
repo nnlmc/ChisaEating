@@ -307,7 +307,7 @@ async def download_assets(target_dir: Path) -> Tuple[bool, str]:
             return False, f"所有下载节点均失败（{detail}）"
         except Exception as exc:
             _cleanup(zip_path, target_dir)
-            logger.exception(f"{LOG_PREFIX} 图库下载部署异常")
+            logger.error(f"{LOG_PREFIX} 图库下载部署异常：{type(exc).__name__}")
             return False, f"图库下载部署异常：{type(exc).__name__}"
         finally:
             STATE.is_downloading = False
