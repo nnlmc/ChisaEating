@@ -8,7 +8,7 @@ from fastapi import Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from gsuid_core.data_store import get_res_path
 from gsuid_core.webconsole.app_app import app
-from gsuid_core.webconsole.web_api import require_auth
+from gsuid_core.webconsole.web_api import require_admin, require_auth
 
 from .utils.downloader import STATE
 from .utils.image_manager import _IMG_EXTS
@@ -147,7 +147,10 @@ async def chisaeating_rename(
 
 
 @app.delete("/api/chisaeating/image/{resource:path}")
-async def chisaeating_delete(resource: str, _: Any = Depends(require_auth)) -> dict[str, Any]:
+async def chisaeating_delete(
+    resource: str,
+    _: Any = Depends(require_admin),
+) -> dict[str, Any]:
     path = _resource_file(resource)
     path.unlink()
     return {"status": 0, "data": {"deleted": resource}}
