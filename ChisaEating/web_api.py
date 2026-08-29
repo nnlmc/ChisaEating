@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from gsuid_core.data_store import get_res_path
 from gsuid_core.webconsole.app_app import app
@@ -93,3 +93,61 @@ async def chisaeating_image(resource: str, _: Any = Depends(require_auth)) -> Fi
     if path.suffix.lower() not in _IMG_EXTS:
         raise HTTPException(status_code=400, detail="非法图片类型")
     return FileResponse(path)
+
+
+@app.post("/api/chisaeating/upload")
+async def chisaeating_upload(
+    relative_dir: str,
+    file: UploadFile = File(...),
+    _: Any = Depends(require_auth),
+) -> dict[str, Any]:
+    directory = (_DATA_ROOT / _safe_relative_path(relative_dir)).resolve()
+    root = _DATA_ROOT.resolve()
+    if root not in directory.parents and directory != root:
+        raise HTTPException(status_code=400, detail="非法资源路径")
+    if Path(file.filename or "").name != file.filename:
+        raise HTTPException(status_code=400, detail="非法文件名")
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in _IMG_EXTS:
+        raise HTTPException(status_code=400, detail="不支持的图片类型")
+    directory.mkdir(parents=True, exist_ok=True)
+    target = directory / Path(file.filename or "").name
+    temp = target.with_name(f".{target.name}.upload")
+    size = 0
+    try:
+        with temp.open("wb") as output:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > 10 * 1024 * 1024:
+                    raise HTTPException(status_code=413, detail="图片超过 10MB 限制")
+                output.write(chunk)
+        temp.replace(target)
+    finally:
+        await file.close()
+        if temp.exists():
+            temp.unlink()
+    return {"status": 0, "data": {"path": target.relative_to(_DATA_ROOT).as_posix()}}
+
+
+@app.post("/api/chisaeating/rename")
+async def chisaeating_rename(
+    resource: str,
+    name: str,
+    _: Any = Depends(require_auth),
+) -> dict[str, Any]:
+    source = _resource_file(resource)
+    target_name = Path(name).name
+    if target_name != name or Path(target_name).suffix.lower() not in _IMG_EXTS:
+        raise HTTPException(status_code=400, detail="非法目标文件名")
+    target = source.with_name(target_name)
+    if target.exists():
+        raise HTTPException(status_code=409, detail="目标文件已存在")
+    source.rename(target)
+    return {"status": 0, "data": {"path": target.relative_to(_DATA_ROOT).as_posix()}}
+
+
+@app.delete("/api/chisaeating/image/{resource:path}")
+async def chisaeating_delete(resource: str, _: Any = Depends(require_auth)) -> dict[str, Any]:
+    path = _resource_file(resource)
+    path.unlink()
+    return {"status": 0, "data": {"deleted": resource}}
