@@ -65,7 +65,7 @@ async def chisaeating_catalog(_: Any = Depends(require_auth)) -> dict[str, Any]:
 
 @app.get("/api/chisaeating/skin")
 async def chisaeating_skin(_: Any = Depends(require_auth)) -> dict[str, Any]:
-    return {"status": 0, "data": {"skins": ["maple_dew", "chisa_red_black", "chisa_red_white", "yy_xuanling"], "default": "maple_dew"}}
+    return {"status": 0, "data": {"skins": ["maple_dew", "chisa_red_black", "chisa_red_white", "yy_xuanling"], "default": "maple_dew", "enabled": True}}
 
 
 @app.get("/api/chisaeating/ganfanren")

@@ -22,6 +22,7 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "admin_users": GsListStrConfig("资源管理用户", "允许使用加菜、上传厨师和图库管理的用户 ID；主人始终允许", []),
     "enable_workshop": GsBoolConfig("启用创意工坊", "允许在 WebUI 中使用创意工坊资源", False),
     "enable_skin": GsBoolConfig("启用主题皮肤", "启用 ChisaEating WebUI 主题皮肤设置", True),
+    "dining_admin_users": GsListStrConfig("点餐管理用户", "允许使用加菜和上传厨师的用户 ID；机器人主人始终允许", []),
     "blacklist_groups": GsListStrConfig("群聊黑名单列表", "填写需要屏蔽的群号，一行一个", []),
     "enable_whitelist": GsBoolConfig("启用群聊白名单", "开启后只有白名单内的群组可触发功能", False),
     "whitelist_groups": GsListStrConfig("群聊白名单列表", "填写允许使用的群号，一行一个", []),
