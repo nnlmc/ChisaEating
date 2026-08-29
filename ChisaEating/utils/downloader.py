@@ -174,20 +174,23 @@ def _verify_archive(path: Path) -> Tuple[bool, str]:
 
 
 @to_thread
-def _extract_archive(zip_path: Path, target_dir: Path) -> int:
-    """解压并部署到 target_dir，返回部署的顶层条目数。
-
-    先解到临时目录，再按 food/drink/chefs 定位真实根，最后覆盖式搬运。
-    """
-    extract_tmp = target_dir / "extract_tmp"
-    if extract_tmp.exists():
-        shutil.rmtree(extract_tmp, ignore_errors=True)
+def _extract_archive(zip_path: Path, target_dir: Path) -> Tuple[int, str]:
+    """安全解压到临时目录，并原子替换资源目录。"""
+    extract_tmp = target_dir / ".extract_tmp"
+    deploy_tmp = target_dir / ".deploy_tmp"
+    for path in (extract_tmp, deploy_tmp):
+        if path.exists():
+            shutil.rmtree(path, ignore_errors=True)
     extract_tmp.mkdir(parents=True, exist_ok=True)
 
     with zipfile.ZipFile(zip_path, "r") as archive:
+        root = extract_tmp.resolve()
+        for member in archive.infolist():
+            destination = (extract_tmp / member.filename).resolve()
+            if destination != root and root not in destination.parents:
+                raise ValueError(f"压缩包包含非法路径：{member.filename}")
         archive.extractall(extract_tmp)
 
-    # 压缩包可能带一层包裹目录，向下找到含 food/drink/chefs 的那一层
     src_dir = extract_tmp
     for candidate in [extract_tmp, *(p for p in extract_tmp.rglob("*") if p.is_dir())]:
         names = {child.name for child in candidate.iterdir() if child.is_dir()}
@@ -195,19 +198,28 @@ def _extract_archive(zip_path: Path, target_dir: Path) -> int:
             src_dir = candidate
             break
 
+    deploy_tmp.mkdir(parents=True, exist_ok=True)
     moved = 0
     for item in src_dir.iterdir():
-        dest = target_dir / item.name
+        destination = deploy_tmp / item.name
         if item.is_dir():
-            if dest.exists():
-                shutil.rmtree(dest, ignore_errors=True)
-            shutil.copytree(item, dest)
+            shutil.copytree(item, destination)
         else:
-            shutil.copy2(item, dest)
+            shutil.copy2(item, destination)
         moved += 1
 
+    managed_names = {item.name for item in deploy_tmp.iterdir()}
+    for item in target_dir.iterdir():
+        if item.name not in {".extract_tmp", ".deploy_tmp", "assets_temp.zip"} and item.name in managed_names:
+            if item.is_dir():
+                shutil.rmtree(item)
+            else:
+                item.unlink()
+    for item in deploy_tmp.iterdir():
+        item.replace(target_dir / item.name)
     shutil.rmtree(extract_tmp, ignore_errors=True)
-    return moved
+    shutil.rmtree(deploy_tmp, ignore_errors=True)
+    return moved, "ok"
 
 
 def _cleanup(zip_path: Path, target_dir: Path) -> None:
@@ -243,10 +255,7 @@ async def _fetch_to(url: str, zip_path: Path) -> Tuple[bool, str]:
 
 
 async def download_assets(target_dir: Path) -> Tuple[bool, str]:
-    """下载并部署图库资源，返回 (是否成功, 结果说明)。
-
-    并发调用时后来者直接返回失败提示，不会重复下载。
-    """
+    """下载并部署图库资源，返回 (是否成功, 结果说明)。"""
     if _LOCK.locked():
         return False, "图库正在下载中，请勿重复触发"
 
@@ -257,56 +266,53 @@ async def download_assets(target_dir: Path) -> Tuple[bool, str]:
         target_dir.mkdir(parents=True, exist_ok=True)
         zip_path = target_dir / "assets_temp.zip"
         failures: List[str] = []
+        try:
+            logger.info(f"{LOG_PREFIX} 开始拉取基础图库（约 {ASSET_TOTAL_BYTES / 1048576:.2f} MB）")
+            STATE.stage = "probing"
+            ranked_urls = await _rank_mirrors()
+            STATE.stage = "downloading"
 
-        logger.info(f"{LOG_PREFIX} 开始拉取基础图库（约 {ASSET_TOTAL_BYTES / 1048576:.2f} MB）")
+            for index, url in enumerate(ranked_urls, 1):
+                host = httpx.URL(url).host
+                logger.info(f"{LOG_PREFIX} 尝试节点 {index}/{len(ranked_urls)}：{host}")
+                STATE.downloaded_bytes = 0
+                ok, reason = await _fetch_to(url, zip_path)
+                if not ok:
+                    logger.warning(f"{LOG_PREFIX} 节点 {host} 下载失败：{reason}")
+                    failures.append(f"{host} {reason}")
+                    if zip_path.exists():
+                        zip_path.unlink()
+                    continue
 
-        STATE.stage = "probing"
-        ranked_urls = await _rank_mirrors()
-        STATE.stage = "downloading"
-
-        for index, url in enumerate(ranked_urls, 1):
-            host = httpx.URL(url).host
-            logger.info(f"{LOG_PREFIX} 尝试节点 {index}/{len(ranked_urls)}：{host}")
-
-            STATE.downloaded_bytes = 0
-            ok, reason = await _fetch_to(url, zip_path)
-            if not ok:
-                logger.warning(f"{LOG_PREFIX} 节点 {host} 下载失败：{reason}")
-                failures.append(f"{host} {reason}")
-                if zip_path.exists():
+                STATE.stage = "verifying"
+                passed, actual = await _verify_archive(zip_path)
+                if not passed:
+                    logger.warning(
+                        f"{LOG_PREFIX} 安全告警：资源包哈希不匹配，预期 {ASSET_SHA256}，实际 {actual}"
+                    )
+                    failures.append(f"{host} 哈希不匹配")
                     zip_path.unlink()
-                continue
+                    continue
 
-            logger.info(
-                f"{LOG_PREFIX} 下载完成 {STATE.downloaded_mb:.2f} MB，开始 SHA-256 校验"
-            )
-            STATE.stage = "verifying"
-            passed, actual = await _verify_archive(zip_path)
-            if not passed:
-                logger.warning(
-                    f"{LOG_PREFIX} 安全告警：资源包哈希不匹配，已删除并尝试下一节点\n"
-                    f"预期 {ASSET_SHA256}\n实际 {actual}"
-                )
-                failures.append(f"{host} 哈希不匹配")
-                zip_path.unlink()
-                continue
+                logger.info(f"{LOG_PREFIX} 校验通过，开始解压部署")
+                STATE.stage = "extracting"
+                moved, _ = await _extract_archive(zip_path, target_dir)
+                _cleanup(zip_path, target_dir)
+                logger.info(f"{LOG_PREFIX} 图库部署完成，共 {moved} 个顶层目录")
+                return True, f"图库已部署完成，共 {moved} 个资源目录"
 
-            logger.info(f"{LOG_PREFIX} 校验通过，开始解压部署")
-            STATE.stage = "extracting"
-            moved = await _extract_archive(zip_path, target_dir)
             _cleanup(zip_path, target_dir)
-
+            detail = "；".join(failures) if failures else "未知原因"
+            logger.error(f"{LOG_PREFIX} 所有下载节点均失败：{detail}")
+            return False, f"所有下载节点均失败（{detail}）"
+        except Exception as exc:
+            _cleanup(zip_path, target_dir)
+            logger.exception(f"{LOG_PREFIX} 图库下载部署异常")
+            return False, f"图库下载部署异常：{type(exc).__name__}"
+        finally:
             STATE.is_downloading = False
             STATE.stage = ""
-            logger.info(f"{LOG_PREFIX} 图库部署完成，共 {moved} 个顶层目录")
-            return True, f"图库已部署完成，共 {moved} 个资源目录"
 
-        _cleanup(zip_path, target_dir)
-        STATE.is_downloading = False
-        STATE.stage = ""
-        detail = "；".join(failures) if failures else "未知原因"
-        logger.error(f"{LOG_PREFIX} 所有下载节点均失败：{detail}")
-        return False, f"所有下载节点均失败（{detail}）"
 
 
 def has_food_assets(target_dir: Path) -> bool:

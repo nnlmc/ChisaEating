@@ -37,7 +37,7 @@ class ImageManager:
         self.plugin_dir = plugin_dir
         self.user_data_dir: Path = get_res_path() / "ChisaEating"
 
-        self._worlds = ["world1", "world2", "world3", "world4", "common"]
+        self._worlds = ["world1", "world2", "world3", "world4", "world5", "common"]
         self._categories = ["food", "drink", "darkfood"]
         self._moods = ["think", "like", "speechless", "scared"]
         self._ensure_dirs()

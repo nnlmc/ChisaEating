@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>千小妹还在吃</title>
+<style>
+:root{font:14px system-ui,sans-serif;color:#29231f;background:#fff8f0}body{margin:0;padding:32px;max-width:1100px;margin-inline:auto}h1{margin-top:0}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}select,button{padding:8px;border:1px solid #d8c7b5;border-radius:8px;background:white}button{cursor:pointer}.status{padding:12px;border-radius:10px;background:#fff0db}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;margin-top:20px}.card{padding:8px;background:white;border-radius:12px;box-shadow:0 2px 12px #0001}.card img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px}.name{word-break:break-all;font-size:12px;margin-top:6px}
+</style>
+</head>
+<body>
+<h1>千小妹还在吃</h1>
+<p>图库管理面板 · 使用 GsCore WebConsole 当前登录会话</p>
+<div class="status" id="status">正在读取状态…</div>
+<div class="toolbar"><select id="category"><option value="food">食物</option><option value="drink">饮品</option><option value="darkfood">黑暗料理</option><option value="chefs">厨师</option><option value="ganfanren">干饭人</option></select><select id="world"><option>world1</option><option>world2</option><option>world3</option><option>world4</option><option>world5</option><option>common</option></select><button id="refresh">刷新图库</button></div>
+<div class="grid" id="grid"></div>
+<script>
+const api=(path)=>fetch(path,{credentials:'same-origin'}).then(r=>{if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()});
+async function load(){const c=document.querySelector('#category').value,w=document.querySelector('#world').value;const data=await api(`/api/chisaeating/images?category=${encodeURIComponent(c)}&world=${encodeURIComponent(w)}`);document.querySelector('#grid').innerHTML=data.data.map(p=>`<div class="card"><img loading="lazy" src="/api/chisaeating/image/${p.split('/').map(encodeURIComponent).join('/')}" alt=""><div class="name">${p}</div></div>`).join('')||'<p>暂无资源</p>'}
+async function status(){const d=await api('/api/chisaeating/status');const s=d.data;document.querySelector('#status').textContent=s.downloading?`下载中：${s.stage} ${s.percent.toFixed(1)}%`:'GsCore 已运行，图库管理 API 正常。'}
+document.querySelector('#refresh').onclick=load;document.querySelector('#category').onchange=load;document.querySelector('#world').onchange=load;Promise.all([status(),load()]).catch(e=>{document.querySelector('#status').textContent=`加载失败：${e.message}`});
+</script>
+</body></html>

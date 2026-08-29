@@ -2,6 +2,7 @@ import json
 import random
 from collections import deque
 from pathlib import Path
+from threading import Lock
 
 from gsuid_core.data_store import get_res_path
 
@@ -13,6 +14,7 @@ class FoodDataManager:
         self.history_path: Path = self.data_path / "group_history.json"
         self.history_limit: int = 30
         self.group_history: dict = {}
+        self._lock = Lock()
         self._load_history_cache()
 
     def _load_history_cache(self):
@@ -21,17 +23,20 @@ class FoodDataManager:
                 data = json.loads(self.history_path.read_text(encoding="utf-8"))
                 for gid, lst in data.items():
                     self.group_history[gid] = deque(lst, maxlen=self.history_limit)
-            except Exception:
+            except (OSError, ValueError):
                 self.group_history = {}
 
     def _save_history_cache(self):
+        export = {gid: list(deq) for gid, deq in self.group_history.items()}
+        temp_path = self.history_path.with_suffix(".json.tmp")
         try:
-            export = {gid: list(deq) for gid, deq in self.group_history.items()}
-            self.history_path.write_text(
+            temp_path.write_text(
                 json.dumps(export, ensure_ascii=False, indent=2), encoding="utf-8"
             )
-        except Exception:
-            pass
+            temp_path.replace(self.history_path)
+        except OSError:
+            if temp_path.exists():
+                temp_path.unlink()
 
     def filter_and_pick(
         self, group_id: str, full_pool: list, active_wv: str, config: dict
@@ -56,26 +61,45 @@ class FoodDataManager:
                 continue
             filtered_pool.append(item)
 
+        # Strict modes must report an empty pool instead of silently violating
+        # the user's selected mode by falling back to all worlds.
         if not filtered_pool:
-            filtered_pool = full_pool
+            return None
 
-        current_limit = config.get("history_limit", 30)
-        if current_limit != self.history_limit:
-            self.history_limit = current_limit
-            for gid in list(self.group_history.keys()):
-                self.group_history[gid] = deque(
-                    list(self.group_history[gid]), maxlen=self.history_limit
-                )
+        current_limit = max(0, int(config.get("history_limit", 30)))
+        weights = {
+            "common": max(0, int(config.get("weight_3d", 70))),
+            "world1": max(0, int(config.get("weight_world1", 20))),
+            "world2": max(0, int(config.get("weight_world2", 5))),
+            "world3": max(0, int(config.get("weight_world3", 5))),
+            "world4": max(0, int(config.get("weight_world4", 0))),
+            "world5": max(0, int(config.get("weight_world5", 0))),
+        }
+        weighted_pool = [item for item in filtered_pool if weights.get(item["wv"], 0) > 0]
+        if weighted_pool:
+            filtered_pool = weighted_pool
 
-        if group_id not in self.group_history:
-            self.group_history[group_id] = deque(maxlen=max(self.history_limit, 1))
-        history = self.group_history[group_id]
+        with self._lock:
+            if current_limit != self.history_limit:
+                self.history_limit = current_limit
+                for gid in list(self.group_history.keys()):
+                    self.group_history[gid] = deque(
+                        list(self.group_history[gid]), maxlen=current_limit
+                    )
 
-        fresh = [i for i in filtered_pool if i["raw_name"] not in history]
-        picked = random.choice(fresh if fresh else filtered_pool)
+            if current_limit == 0:
+                return random.choice(filtered_pool)
 
-        if self.history_limit > 0:
+            if group_id not in self.group_history:
+                self.group_history[group_id] = deque(maxlen=current_limit)
+            history = self.group_history[group_id]
+            fresh = [i for i in filtered_pool if i["raw_name"] not in history]
+            candidates = fresh if fresh else filtered_pool
+            picked = random.choices(
+                candidates,
+                weights=[weights.get(item["wv"], 1) for item in candidates],
+                k=1,
+            )[0]
             history.append(picked["raw_name"])
             self._save_history_cache()
-
-        return picked
+            return picked

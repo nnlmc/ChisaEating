@@ -1,4 +1,5 @@
 import random
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, TypedDict
 
@@ -14,6 +15,9 @@ from ..utils.downloader import has_food_assets
 from ..utils.food_data import FoodDataManager
 from ..utils.image_manager import ImageManager
 from ..utils.rate_limiter import RateLimiter
+
+# API routes are imported with the plugin so the shared Core server exposes them.
+from .. import web_api as _web_api  # noqa: F401
 
 sv = SV("千小妹还在吃", pm=6, area="ALL")
 
@@ -80,6 +84,12 @@ class ConfigSnapshot(TypedDict):
     global_meme_prob: int
     chef_meme_prob: int
     interception_egg_chance: int
+    weight_3d: int
+    weight_world1: int
+    weight_world2: int
+    weight_world3: int
+    weight_world4: int
+    weight_world5: int
 
 
 _WORLD_PHRASES: Dict[str, WorldPhrasesData] = {
@@ -139,11 +149,34 @@ _WORLD_PHRASES: Dict[str, WorldPhrasesData] = {
         "厨师句式": ["【{chef}】特制了{food}哦"],
         "打断句式": ["别刷啦！{bot}已经跟不上了"],
     },
+    "world5": {
+        "专属句式": ["{bot}为你端来了{food}", "今天的推荐是{food}，请慢用"],
+        "厨师句式": ["【{chef}】为你准备了{food}！"],
+        "打断句式": ["先歇一会儿吧，{bot}的后厨需要喘口气"],
+    },
 }
+
+def _configured_keywords(key: str, fallback: tuple[str, ...]) -> tuple[str, ...]:
+    values = CHISA_CONFIG.get_config(key).data
+    configured = tuple(str(value).strip() for value in values if str(value).strip())
+    return configured or fallback
+
+
+def _is_exact_trigger(message: str, keywords: tuple[str, ...]) -> bool:
+    return message.strip() in keywords
+
+
+def _extract_forced_chef(message: str) -> str | None:
+    match = re.search(r"(?:召唤|想和)(?P<chef>.+?)(?:下厨|吃饭)$", message.strip())
+    if match:
+        return match.group("chef").strip() or None
+    match = re.search(r"^(?P<chef>.+?)特供料理$", message.strip())
+    return match.group("chef").strip() if match else None
+
 
 def _get_wv_settings() -> Dict[str, WorldConf]:
     result: Dict[str, WorldConf] = {}
-    for i in range(1, 5):
+    for i in range(1, 6):
         wk = f"world{i}"
         result[wk] = {
             "名称": CHISA_CONFIG.get_config(f"{wk}_name").data,
@@ -167,7 +200,7 @@ def _build_alias_map(wv_settings: Dict[str, WorldConf]) -> Dict[str, str]:
 
 def _resolve_active_key() -> str:
     sel: str = CHISA_CONFIG.get_config("active_world").data
-    if sel in ("world1", "world2", "world3", "world4"):
+    if sel in ("world1", "world2", "world3", "world4", "world5"):
         return sel
     return "world1"
 
@@ -186,40 +219,61 @@ def _build_config_snapshot() -> ConfigSnapshot:
         global_meme_prob=CHISA_CONFIG.get_config("global_meme_prob").data,
         chef_meme_prob=CHISA_CONFIG.get_config("chef_meme_prob").data,
         interception_egg_chance=CHISA_CONFIG.get_config("interception_egg_chance").data,
+        weight_3d=CHISA_CONFIG.get_config("weight_3d").data,
+        weight_world1=CHISA_CONFIG.get_config("weight_world1").data,
+        weight_world2=CHISA_CONFIG.get_config("weight_world2").data,
+        weight_world3=CHISA_CONFIG.get_config("weight_world3").data,
+        weight_world4=CHISA_CONFIG.get_config("weight_world4").data,
+        weight_world5=CHISA_CONFIG.get_config("weight_world5").data,
     )
 
 
-@sv.on_keyword(_EAT_KWS, prefix=False)
+@sv.on_command(_EAT_KWS, prefix=False)
 async def on_eat(bot: Bot, ev: Event) -> None:
+    msg = ev.raw_text.strip()
+    if not _is_exact_trigger(msg, _configured_keywords("trigger_eat", _EAT_KWS)):
+        return
     logger.info(f"[ChisaEating] 点餐(食) | uid={ev.user_id} gid={ev.group_id}")
     await _process_request(bot, ev, "food")
 
 
-@sv.on_keyword(_DRINK_KWS, prefix=False)
+@sv.on_command(_DRINK_KWS, prefix=False)
 async def on_drink(bot: Bot, ev: Event) -> None:
+    msg = ev.raw_text.strip()
+    if not _is_exact_trigger(msg, _configured_keywords("trigger_drink", _DRINK_KWS)):
+        return
     logger.info(f"[ChisaEating] 点餐(饮) | uid={ev.user_id} gid={ev.group_id}")
     await _process_request(bot, ev, "drink")
 
 
-@sv.on_keyword(_DARK_KWS, prefix=False)
+@sv.on_command(_DARK_KWS, prefix=False)
 async def on_dark(bot: Bot, ev: Event) -> None:
+    msg = ev.raw_text.strip()
+    if not _is_exact_trigger(msg, _configured_keywords("trigger_dark", _DARK_KWS)):
+        return
     logger.info(f"[ChisaEating] 点餐(黑暗料理) | uid={ev.user_id} gid={ev.group_id}")
     await _process_request(bot, ev, "dark")
 
 
-@sv.on_keyword(_COMMON_EAT_KWS, prefix=False)
+@sv.on_command(_COMMON_EAT_KWS, prefix=False)
 async def on_common_eat(bot: Bot, ev: Event) -> None:
+    msg = ev.raw_text.strip()
+    if not _is_exact_trigger(msg, _configured_keywords("trigger_common_eat", _COMMON_EAT_KWS)):
+        return
     logger.info(f"[ChisaEating] 点餐(三次元食) | uid={ev.user_id} gid={ev.group_id}")
     await _process_request(bot, ev, "food", forced_world="common")
 
 
-@sv.on_keyword(_COMMON_DRINK_KWS, prefix=False)
+@sv.on_command(_COMMON_DRINK_KWS, prefix=False)
 async def on_common_drink(bot: Bot, ev: Event) -> None:
+    msg = ev.raw_text.strip()
+    if not _is_exact_trigger(msg, _configured_keywords("trigger_common_drink", _COMMON_DRINK_KWS)):
+        return
     logger.info(f"[ChisaEating] 点餐(三次元饮) | uid={ev.user_id} gid={ev.group_id}")
     await _process_request(bot, ev, "drink", forced_world="common")
 
 
-@sv.on_keyword(("特产",), prefix=False)
+@sv.on_command(("特产",), prefix=False)
 async def on_world_special(bot: Bot, ev: Event) -> None:
     msg: str = ev.raw_text.strip()
     if any(k in msg for k in _ALL_CAT_KWS):
@@ -302,6 +356,8 @@ async def _process_request(
                 forced_world = wk
                 logger.debug(f"[ChisaEating] 别称匹配 alias={alias!r} -> world={wk}")
                 break
+
+    forced_chef = _extract_forced_chef(msg)
 
     active_key: str = (
         forced_world
@@ -389,9 +445,13 @@ async def _process_request(
 
     # 强制世界过滤
     if forced_world is not None:
-        strict: List[PoolItem] = [item for item in pool if item["wv"] == forced_world]
-        if strict:
-            pool = strict
+        pool = [item for item in pool if item["wv"] == forced_world]
+    if forced_chef is not None:
+        chef_pool = [item for item in pool if item["chef"] == forced_chef]
+        if not chef_pool:
+            await bot.send(f"【千小妹提示】没有找到厨师“{forced_chef}”的可用料理。")
+            return
+        pool = chef_pool
 
     if not pool:
         logger.warning(

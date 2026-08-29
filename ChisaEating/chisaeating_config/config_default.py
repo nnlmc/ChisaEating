@@ -14,14 +14,24 @@ from gsuid_core.utils.plugins_config.models import (
 SHOW_CONFIG_PATH = get_res_path(["ChisaEating", "show"])
 
 CONFIG_DEFAULT: Dict[str, GSC] = {
-    "_DividerScope": GsDivider("使用范围", ""),
-    "enable_blacklist": GsBoolConfig("启用群聊黑名单", "开启后黑名单内的群组无法触发功能（最高优先级）", False),
+    "forward_long_text": GsBoolConfig("长文本转发", "帮助和商会清单较长时优先使用合并转发", True),
+    "convert_meme_to_gif": GsBoolConfig("表情包自动转 GIF", "启用后尝试将静态附加表情转换为 GIF；主菜图片不受影响", True),
+    "enable_ai": GsBoolConfig("启用智能拟人回复", "预留 AI 回复开关；关闭时使用本地文案", False),
+    "ai_probability": GsIntConfig("AI 回复概率 %", "启用智能回复后，使用 AI 生成文案的概率", 5),
+    "admin_users": GsListStrConfig("资源管理用户", "允许使用加菜、上传厨师和图库管理的用户 ID；主人始终允许", []),
+
     "blacklist_groups": GsListStrConfig("群聊黑名单列表", "填写需要屏蔽的群号，一行一个", []),
     "enable_whitelist": GsBoolConfig("启用群聊白名单", "开启后只有白名单内的群组可触发功能", False),
     "whitelist_groups": GsListStrConfig("群聊白名单列表", "填写允许使用的群号，一行一个", []),
 
     "_DividerActiveWorld": GsDivider("默认世界", ""),
-    "active_world": GsStrConfig("默认激活世界", "world1 / world2 / world3 / world4，决定默认推荐官人称与表情包来源", "world1"),
+    "active_world": GsStrConfig("默认激活世界", "world1 / world2 / world3 / world4 / world5，决定默认推荐官人称与表情包来源", "world1"),
+    "weight_3d": GsIntConfig("三次元池权重", "大乱斗模式下三次元文字池的抽取权重", 70),
+    "weight_world1": GsIntConfig("世界1池权重", "大乱斗模式下世界1的抽取权重", 20),
+    "weight_world2": GsIntConfig("世界2池权重", "大乱斗模式下世界2的抽取权重", 5),
+    "weight_world3": GsIntConfig("世界3池权重", "大乱斗模式下世界3的抽取权重", 5),
+    "weight_world4": GsIntConfig("世界4池权重", "大乱斗模式下世界4的抽取权重", 0),
+    "weight_world5": GsIntConfig("世界5池权重", "大乱斗模式下世界5的抽取权重", 0),
 
     "_DividerWorld1": GsDivider("世界 1：鸣潮", ""),
     "world1_name": GsStrConfig("世界1名称", "世界1的主名称", "鸣潮"),
@@ -40,18 +50,24 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "world2_dark_text": GsListStrConfig("世界2文字黑暗料理池", "", ["奇怪的烤肉排", "微妙的甜甜花酿鸡", "散发诡异气息的冷面"]),
 
     "_DividerCustomWorld": GsDivider("自定义世界", ""),
-    "world3_name": GsStrConfig("世界3名称", "", "世界3"),
-    "world3_aliases": GsListStrConfig("世界3别名", "", []),
-    "world3_selfnames": GsListStrConfig("世界3推荐官自称池", "", ["向导3"]),
+    "world3_name": GsStrConfig("世界3名称", "", "终末地"),
+    "world3_aliases": GsListStrConfig("世界3别名", "", ["塔卫二", "帝江号"]),
+    "world3_selfnames": GsListStrConfig("世界3推荐官自称池", "", ["管理员", "咕咕嘎嘎"]),
     "world3_food_text": GsListStrConfig("世界3文字食物池", "", []),
     "world3_drink_text": GsListStrConfig("世界3文字饮品池", "", []),
-    "world3_dark_text": GsListStrConfig("世界3文字黑暗料理池", "", []),
+    "world3_dark_text": GsListStrConfig("世界3文字黑暗料理池", "", ["源石变异体残骸", "工业废液提取物"]),
     "world4_name": GsStrConfig("世界4名称", "", "世界4"),
     "world4_aliases": GsListStrConfig("世界4别名", "", []),
     "world4_selfnames": GsListStrConfig("世界4推荐官自称池", "", ["向导4"]),
     "world4_food_text": GsListStrConfig("世界4文字食物池", "", []),
     "world4_drink_text": GsListStrConfig("世界4文字饮品池", "", []),
     "world4_dark_text": GsListStrConfig("世界4文字黑暗料理池", "", []),
+    "world5_name": GsStrConfig("世界5名称", "", "世界5"),
+    "world5_aliases": GsListStrConfig("世界5别名", "", []),
+    "world5_selfnames": GsListStrConfig("世界5推荐官自称池", "", ["向导5"]),
+    "world5_food_text": GsListStrConfig("世界5文字食物池", "", []),
+    "world5_drink_text": GsListStrConfig("世界5文字饮品池", "", []),
+    "world5_dark_text": GsListStrConfig("世界5文字黑暗料理池", "", []),
 
     "_DividerTriggers": GsDivider("触发词", ""),
     "trigger_eat": GsListStrConfig("吃什么触发词", "包含这些词的消息触发食物推荐", ["吃什么", "吃啥", "吃点儿啥"]),
@@ -81,6 +97,11 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "mode_normie": GsBoolConfig("二刺猿不熟模式", "只推荐三次元普通食物，完全不推荐二次元特产", False),
 
     "_DividerTemplates": GsDivider("文案模板", ""),
+    "generic_drink_templates": GsListStrConfig(
+        "常规饮品推荐句式池",
+        "抽中饮品时的后备句式，支持变量: {bot} {food}",
+        ["铛铛！为你抽中了清爽的{food}！", "喝杯{food}解解渴吧！", "听{bot}的，今天来一杯{food}准没错~"],
+    ),
     "crossover_templates": GsListStrConfig(
         "跨次元联动句式池",
         "跨界抽中其他世界食物时的句式，支持变量: {bot_a} {bot_b} {world_a} {world_b} {full_food_desc}",
