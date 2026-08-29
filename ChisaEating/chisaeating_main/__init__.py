@@ -199,7 +199,10 @@ def _build_alias_map(wv_settings: Dict[str, WorldConf]) -> Dict[str, str]:
 
 
 def _resolve_active_key() -> str:
-    sel: str = CHISA_CONFIG.get_config("active_world").data
+    sel: str = str(CHISA_CONFIG.get_config("active_world").data).strip()
+    named = {conf["名称"]: key for key, conf in _get_wv_settings().items()}
+    if sel in named:
+        return named[sel]
     if sel in ("world1", "world2", "world3", "world4", "world5"):
         return sel
     return "world1"
