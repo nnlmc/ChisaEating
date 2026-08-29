@@ -50,6 +50,19 @@ async def chisaeating_asset(asset: str) -> FileResponse:
     return FileResponse(path)
 
 
+@app.get("/api/chisaeating/catalog")
+async def chisaeating_catalog(_: Any = Depends(require_auth)) -> dict[str, Any]:
+    result: dict[str, list[str]] = {}
+    for category in ("food", "drink", "darkfood", "chefs", "ganfanren"):
+        directory = _DATA_ROOT / category
+        result[category] = [
+            path.relative_to(_DATA_ROOT).as_posix()
+            for path in sorted(directory.rglob("*"))
+            if path.is_file() and not path.is_symlink() and path.suffix.lower() in _IMG_EXTS
+        ] if directory.is_dir() else []
+    return {"status": 0, "data": result}
+
+
 @app.get("/api/chisaeating/status")
 async def chisaeating_status(_: Any = Depends(require_auth)) -> dict[str, Any]:
     return {

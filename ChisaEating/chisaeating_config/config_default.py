@@ -20,7 +20,8 @@ CONFIG_DEFAULT: Dict[str, GSC] = {
     "enable_ai": GsBoolConfig("启用智能拟人回复", "预留 AI 回复开关；关闭时使用本地文案", False),
     "ai_probability": GsIntConfig("AI 回复概率 %", "启用智能回复后，使用 AI 生成文案的概率", 5),
     "admin_users": GsListStrConfig("资源管理用户", "允许使用加菜、上传厨师和图库管理的用户 ID；主人始终允许", []),
-
+    "enable_workshop": GsBoolConfig("启用创意工坊", "允许在 WebUI 中使用创意工坊资源", False),
+    "enable_skin": GsBoolConfig("启用主题皮肤", "启用 ChisaEating WebUI 主题皮肤设置", True),
     "blacklist_groups": GsListStrConfig("群聊黑名单列表", "填写需要屏蔽的群号，一行一个", []),
     "enable_whitelist": GsBoolConfig("启用群聊白名单", "开启后只有白名单内的群组可触发功能", False),
     "whitelist_groups": GsListStrConfig("群聊白名单列表", "填写允许使用的群号，一行一个", []),
