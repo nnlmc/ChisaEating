@@ -3,45 +3,47 @@ import random
 from collections import deque
 from pathlib import Path
 from threading import Lock
+from typing import Any, Dict, List, Optional
 
 from gsuid_core.data_store import get_res_path
+from gsuid_core.logger import logger
 
 
 class FoodDataManager:
-    def __init__(self):
-        self.data_path: Path = get_res_path() / "ChisaEating"
-        self.data_path.mkdir(parents=True, exist_ok=True)
-        self.history_path: Path = self.data_path / "group_history.json"
-        self.history_limit: int = 30
-        self.group_history: dict = {}
+    def __init__(self, history_limit: int = 30):
+        self.history_limit = history_limit
+        self.group_history: Dict[str, deque] = {}
         self._lock = Lock()
+        self.cache_file = get_res_path() / "ChisaEating" / "history_cache.json"
         self._load_history_cache()
 
     def _load_history_cache(self):
-        if self.history_path.exists():
+        if self.cache_file.exists():
             try:
-                data = json.loads(self.history_path.read_text(encoding="utf-8"))
-                for gid, lst in data.items():
-                    self.group_history[gid] = deque(lst, maxlen=self.history_limit)
-            except (OSError, ValueError):
-                self.group_history = {}
+                with open(self.cache_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    for gid, hist in data.items():
+                        self.group_history[gid] = deque(hist, maxlen=self.history_limit)
+            except Exception as e:
+                logger.error(f"[ChisaEating] 读取历史记录失败: {e}")
 
     def _save_history_cache(self):
-        export = {gid: list(deq) for gid, deq in self.group_history.items()}
-        temp_path = self.history_path.with_suffix(".json.tmp")
         try:
-            temp_path.write_text(
-                json.dumps(export, ensure_ascii=False, indent=2), encoding="utf-8"
-            )
-            temp_path.replace(self.history_path)
-        except OSError:
-            if temp_path.exists():
-                temp_path.unlink()
+            self.cache_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.cache_file, "w", encoding="utf-8") as f:
+                data = {gid: list(hist) for gid, hist in self.group_history.items()}
+                json.dump(data, f, ensure_ascii=False)
+        except Exception as e:
+            logger.error(f"[ChisaEating] 保存历史记录失败: {e}")
 
     def filter_and_pick(
-        self, group_id: str, full_pool: list, active_wv: str, config: dict
-    ):
-        if not full_pool:
+        self,
+        group_id: str,
+        pool: List[Dict[str, Any]],
+        active_wv: str,
+        config: Dict[str, Any],
+    ) -> Optional[Dict[str, Any]]:
+        if not pool:
             return None
 
         mode_loyal = config.get("mode_loyal", False)
@@ -49,11 +51,9 @@ class FoodDataManager:
         mode_normie = config.get("mode_normie", False)
 
         filtered_pool = []
-        for item in full_pool:
-            wv = item["wv"]
-            if mode_normie:
-                if wv == "common":
-                    filtered_pool.append(item)
+        for item in pool:
+            wv = item.get("wv", "common")
+            if mode_normie and wv != "common":
                 continue
             if mode_roller and wv == "common":
                 continue
@@ -61,8 +61,6 @@ class FoodDataManager:
                 continue
             filtered_pool.append(item)
 
-        # Strict modes must report an empty pool instead of silently violating
-        # the user's selected mode by falling back to all worlds.
         if not filtered_pool:
             return None
 
@@ -88,18 +86,16 @@ class FoodDataManager:
                     )
 
             if current_limit == 0:
-                return random.choice(filtered_pool)
+                item_weights = [max(1, weights.get(item["wv"], 1)) for item in filtered_pool]
+                return random.choices(filtered_pool, weights=item_weights, k=1)[0]
 
             if group_id not in self.group_history:
                 self.group_history[group_id] = deque(maxlen=current_limit)
             history = self.group_history[group_id]
             fresh = [i for i in filtered_pool if i["raw_name"] not in history]
             candidates = fresh if fresh else filtered_pool
-            picked = random.choices(
-                candidates,
-                weights=[weights.get(item["wv"], 1) for item in candidates],
-                k=1,
-            )[0]
+            item_weights = [max(1, weights.get(item["wv"], 1)) for item in candidates]
+            picked = random.choices(candidates, weights=item_weights, k=1)[0]
             history.append(picked["raw_name"])
             self._save_history_cache()
             return picked

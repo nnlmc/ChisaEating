@@ -25,6 +25,14 @@
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
+      },
+      {
+        "name": "大厨下厨",
+        "desc": "指定厨师料理",
+        "eg": "召唤爱弥斯下厨 / 弗洛洛特供料理",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
       }
     ]
   },
@@ -49,63 +57,98 @@
       },
       {
         "name": "异界特产",
-        "desc": "按世界别称抽取特产，支持鸣潮、原神等别名",
-        "eg": "鸣潮特产",
+        "desc": "按世界别称抽取特产",
+        "eg": "鸣潮特产 / 原神特饮",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       }
     ]
   },
-  "自定义资源": {
-    "desc": "本地扩展食物和干饭人",
+  "商会与DLC": {
+    "desc": "云端无缝进货与扩展包",
     "data": [
       {
-        "name": "自定义干饭人",
-        "desc": "在 data/ChisaEating/ganfanren/ 下添加表情包和 words.txt",
-        "eg": "干饭帮助",
+        "name": "千小妹商会",
+        "desc": "唤出千小妹云端商会互动进货菜单",
+        "eg": "千小妹商会",
         "need_ck": false,
         "need_sk": false,
-        "need_admin": false
+        "need_admin": true
+      },
+      {
+        "name": "商会同步",
+        "desc": "强制同步商会最新商品名录",
+        "eg": "千小妹商会信息同步",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": true
+      },
+      {
+        "name": "商会进货",
+        "desc": "输入DLC编号一键进货到本地后厨",
+        "eg": "进货fd0001 / 招募gf0001",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": true
       }
     ]
   },
-  "厨师与资源管理": {
-    "desc": "厨师、干饭人与图库资源",
+  "图库与管理": {
+    "desc": "后厨管理与图库维护",
     "data": [
       {
-        "name": "厨师召唤",
-        "desc": "召唤指定厨师下厨或享用特供料理",
-        "eg": "召唤某某下厨",
+        "name": "指令速查",
+        "desc": "快速查看千小妹常用短指令",
+        "eg": "千小妹速查",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
       },
       {
-        "name": "更新千小妹图库",
-        "desc": "下载或更新基础食物图库（仅主人）",
+        "name": "图库统计",
+        "desc": "查看本地图库各世界食物/饮品统计",
+        "eg": "查千小妹图库",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": false
+      },
+      {
+        "name": "加菜",
+        "desc": "向指定世界与分类添加菜品(带图)",
+        "eg": "加菜 鸣潮 食物 肯德基肉霸堡 (带图)",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": true
+      },
+      {
+        "name": "加大厨",
+        "desc": "向厨师图库添加厨师立绘(带图)",
+        "eg": "上传厨师 刻晴 (带图)",
+        "need_ck": false,
+        "need_sk": false,
+        "need_admin": true
+      },
+      {
+        "name": "图库更新",
+        "desc": "从远程安全同步或重建基础图库",
         "eg": "更新千小妹图库",
         "need_ck": false,
         "need_sk": false,
         "need_admin": true
       },
       {
-        "name": "WebUI图库管理",
-        "desc": "打开同源的图库管理页面，复用GsCore登录会话",
-        "eg": "/app/chisaeating/",
+        "name": "下载进度",
+        "desc": "查看后台图库拉取进度",
+        "eg": "千小妹图库下载进度",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false
-      }
-    ]
-  },
-  "帮助说明": {
-    "desc": "使用和权限说明",
-    "data": [
+      },
       {
-        "name": "千小妹速查",
-        "desc": "查看完整命令、配置和权限说明",
-        "eg": "千小妹速查",
+        "name": "WebUI管理",
+        "desc": "打开 Web 控制台插件管理面板",
+        "eg": "/plugin-pages/chisaeating/manager/",
         "need_ck": false,
         "need_sk": false,
         "need_admin": false

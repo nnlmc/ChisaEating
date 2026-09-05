@@ -1,1 +1,2 @@
-ChisaEating_version = "3.0.0"
+ChisaEating_version = "4.2.4"
+
