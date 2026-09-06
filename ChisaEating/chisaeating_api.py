@@ -18,7 +18,6 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
 from gsuid_core.data_store import get_res_path
 from gsuid_core.logger import logger
-from gsuid_core.pool import to_thread
 from gsuid_core.webconsole.app_app import app
 
 router = APIRouter(prefix="/api/chisaeating", tags=["ChisaEating"])
@@ -1405,7 +1404,7 @@ async def page_download_dlc(request: Request) -> JSONResponse:
 
         target_extract_dir = str(_get_base_dir())
         try:
-            await to_thread(_extract_dlc_zip_safe, str(temp_zip_path), target_extract_dir)
+            await asyncio.to_thread(_extract_dlc_zip_safe, str(temp_zip_path), target_extract_dir)
 
             if temp_zip_path.exists():
                 temp_zip_path.unlink()

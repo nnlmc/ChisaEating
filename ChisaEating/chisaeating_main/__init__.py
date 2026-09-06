@@ -28,7 +28,6 @@ import asyncio
 import json
 import shutil
 import aiohttp
-from gsuid_core.pool import to_thread
 
 # API routes are imported with the plugin so the shared Core server exposes them.
 from .. import web_api as _web_api  # noqa: F401
@@ -546,7 +545,7 @@ async def on_chisa_dlc_download(bot: Bot, ev: Event) -> None:
                 raise ValueError(f"哈希校验失败！预期 {expected_sha256[:8]}，实际 {actual_sha[:8]}")
 
             target_extract_dir = str(_get_base_dir())
-            await to_thread(_extract_dlc_zip_safe, str(temp_zip), target_extract_dir)
+            await asyncio.to_thread(_extract_dlc_zip_safe, str(temp_zip), target_extract_dir)
             if temp_zip.exists():
                 temp_zip.unlink()
 
